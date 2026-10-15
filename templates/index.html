@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nova AI</title>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js"></script>
+  <style>
+    :root{--bg:#212121;--sidebar:#171717;--surface:#2f2f2f;--hover:#383838;--border:#3f3f3f;--text:#ececec;--muted:#a8a8a8;--max:820px}
+    *{box-sizing:border-box} html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    button,textarea,select,input{font:inherit} button{color:inherit;border:0;cursor:pointer}
+    .app{display:flex;height:100vh;overflow:hidden}
+    .sidebar{width:260px;min-width:260px;background:var(--sidebar);display:flex;flex-direction:column;padding:10px;transition:.2s;z-index:20}
+    .sidebar.collapsed{width:0;min-width:0;padding-left:0;padding-right:0;overflow:hidden}
+    .sidebar-top{display:flex;gap:8px;margin-bottom:12px}.new-chat{flex:1;background:transparent;border:1px solid var(--border);border-radius:10px;padding:10px 12px;text-align:left}
+    .new-chat:hover,.icon-btn:hover,.conversation:hover{background:var(--hover)}
+    .icon-btn{width:40px;height:40px;background:transparent;border-radius:10px;display:grid;place-items:center;font-size:18px}
+    .sidebar-label{color:var(--muted);font-size:12px;padding:10px 8px 6px}.conversation-list{overflow-y:auto;flex:1}
+    .conversation{width:100%;background:transparent;border-radius:8px;padding:9px 10px;margin-bottom:2px;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#ddd}
+    .conversation.active{background:#2a2a2a}.sidebar-footer{color:var(--muted);font-size:12px;padding:10px 8px 4px;border-top:1px solid #292929}
+    .main{flex:1;min-width:0;display:flex;flex-direction:column;position:relative}.topbar{height:58px;min-height:58px;display:flex;align-items:center;gap:10px;padding:0 14px}
+    .model-select{background:transparent;color:var(--text);border:0;font-weight:600;padding:8px;border-radius:8px;outline:none}.model-select:hover{background:var(--surface)}.model-select option{background:var(--surface);color:var(--text)}
+    .chat-scroll{flex:1;overflow-y:auto;scroll-behavior:smooth}.empty-state{min-height:calc(100vh - 190px);display:flex;align-items:center;justify-content:center;padding:30px 20px}
+    .empty-card{width:min(650px,100%);text-align:center}.brand-mark{width:44px;height:44px;border-radius:14px;background:#fff;color:#111;display:inline-grid;place-items:center;margin-bottom:18px;font-weight:800;font-size:20px}
+    .empty-card h1{font-size:28px;margin:0 0 8px;font-weight:600}.empty-card p{color:var(--muted);margin:0;line-height:1.6}
+    .messages{width:100%;padding:18px 0 160px}.message-row{width:100%;padding:10px 20px}.message-inner{width:min(var(--max),100%);margin:0 auto}
+    .message-row.user .message-inner{display:flex;justify-content:flex-end}.user-bubble{max-width:78%;background:var(--surface);border-radius:18px;padding:10px 15px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere}
+    .assistant-content{line-height:1.7;font-size:15px;overflow-wrap:anywhere}.assistant-content pre{position:relative;background:#111;border:1px solid #333;border-radius:10px;padding:16px;overflow-x:auto}
+    .assistant-content code{font-family:Consolas,"Liberation Mono",monospace;font-size:13px}.assistant-content :not(pre)>code{background:#303030;padding:2px 5px;border-radius:5px}
+    .copy-code{position:absolute;top:8px;right:8px;background:#2a2a2a;color:#ddd;padding:5px 8px;border-radius:6px;font-size:11px}
+    .thinking{display:inline-flex;align-items:center;gap:4px;color:var(--muted)}.dot{width:5px;height:5px;background:var(--muted);border-radius:50%;animation:pulse 1.2s infinite ease-in-out}.dot:nth-child(2){animation-delay:.15s}.dot:nth-child(3){animation-delay:.3s}
+    @keyframes pulse{0%,80%,100%{opacity:.25;transform:scale(.8)}40%{opacity:1;transform:scale(1)}}
+    .composer-wrap{position:absolute;left:0;right:0;bottom:0;padding:20px 16px 14px;background:linear-gradient(to top,var(--bg) 72%,rgba(33,33,33,0))}
+    .composer{width:min(var(--max),100%);margin:0 auto;background:var(--surface);border:1px solid #404040;border-radius:24px;padding:8px 10px 8px 12px;box-shadow:0 10px 35px rgba(0,0,0,.18)}
+    .composer textarea{width:100%;min-height:40px;max-height:180px;resize:none;border:0;outline:0;background:transparent;color:var(--text);padding:8px 8px 4px;line-height:1.45}
+    .composer-actions{display:flex;align-items:center;justify-content:space-between;gap:8px}.left-actions,.right-actions{display:flex;align-items:center;gap:6px}
+    .round-btn{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:transparent;color:#ddd}.round-btn:hover{background:#444}.send-btn{background:#fff;color:#111}.send-btn:disabled{opacity:.35;cursor:default}
+    .status-line{width:min(var(--max),100%);margin:6px auto 0;min-height:18px;padding:0 10px;color:var(--muted);font-size:12px}
+    .upload-chip{display:none;align-items:center;gap:8px;margin:4px 6px 8px;background:#404040;border-radius:10px;padding:8px 10px;font-size:12px;max-width:fit-content}
+    .error-banner{position:fixed;top:14px;right:14px;max-width:420px;background:#572727;border:1px solid #8b3d3d;color:#ffdada;padding:11px 14px;border-radius:10px;z-index:100;display:none}
+    @media(max-width:760px){.sidebar{position:fixed;left:0;top:0;height:100%;transform:translateX(-100%);width:280px;min-width:280px;box-shadow:20px 0 50px rgba(0,0,0,.35)}.sidebar.mobile-open{transform:translateX(0)}.sidebar.collapsed{width:280px;min-width:280px}.user-bubble{max-width:90%}.message-row{padding-left:14px;padding-right:14px}}
+  </style>
+
+<style>
+:root{
+  --bg:#0d0f13;--sidebar:#111318;--surface:#1d212b;--surface2:#242a36;
+  --hover:#202530;--border:rgba(255,255,255,.08);--text:#f4f6fa;--muted:#8e96a7;
+  --accent:#8b8cff;--accent2:#68d5ff;--max:880px;
+}
+html,body{background:radial-gradient(circle at 74% -8%,rgba(139,140,255,.10),transparent 30%),var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.sidebar{width:286px;min-width:286px;padding:14px 12px 12px;background:linear-gradient(180deg,#111318,#0f1116);border-right:1px solid var(--border)}
+.sidebar-brand{display:flex;align-items:center;gap:11px;padding:8px 8px 17px}.sidebar-logo,.brand-mark{background:linear-gradient(145deg,var(--accent),var(--accent2))!important;color:#071017!important;box-shadow:0 12px 34px rgba(104,135,255,.22);font-weight:800}
+.sidebar-logo{width:36px;height:36px;border-radius:11px;display:grid;place-items:center}.sidebar-brand-name{font-weight:700;font-size:15px;letter-spacing:-.02em}.sidebar-brand-sub{font-size:11px;color:var(--muted);margin-top:3px}
+.sidebar-top{gap:8px;margin-bottom:8px}.new-chat,.icon-btn{height:42px;border-radius:12px;border:1px solid var(--border);background:rgba(255,255,255,.02);transition:.18s ease}.new-chat{font-weight:600;color:#dfe4ed}.new-chat:hover,.icon-btn:hover,.conversation:hover{background:rgba(255,255,255,.055);border-color:rgba(255,255,255,.13)}
+.sidebar-label{text-transform:uppercase;letter-spacing:.12em;font-size:10px;font-weight:700;color:#727b8f;padding:13px 10px 8px}.conversation{min-height:42px;padding:9px 10px;border:1px solid transparent;border-radius:10px;color:#c8ceda}.conversation.active{background:linear-gradient(90deg,rgba(139,140,255,.13),rgba(104,213,255,.04));border-color:rgba(139,140,255,.14);color:#f4f6fa}.sidebar-footer{display:flex;align-items:center;gap:8px;padding:14px 9px 5px;border-color:var(--border);font-size:11px}.online-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#6fd4a4;box-shadow:0 0 0 4px rgba(111,212,164,.08)}
+.main{background:radial-gradient(circle at 50% 0,rgba(139,140,255,.035),transparent 24%)}.topbar{height:64px;min-height:64px;justify-content:space-between;padding:0 18px;border-bottom:1px solid rgba(255,255,255,.045);background:rgba(13,15,19,.72);backdrop-filter:blur(18px)}.topbar-left{display:flex;align-items:center;gap:9px}.model-wrap{display:flex;align-items:center}.model-select{font-size:13px;color:#dfe4ed;padding:9px 10px;border-radius:10px}.topbar-badge{font-size:11px;color:#91a0b5;padding:7px 10px;border:1px solid var(--border);border-radius:999px;background:rgba(255,255,255,.025)}
+.empty-state{min-height:calc(100vh - 200px);padding:42px 20px 150px}.empty-card{width:min(760px,100%)}.brand-mark{width:58px;height:58px;border-radius:18px;font-size:23px;margin-bottom:20px}.empty-card h1{font-size:clamp(28px,4vw,40px);letter-spacing:-.035em;font-weight:700;margin-bottom:12px}.empty-card p{max-width:590px;margin:0 auto;color:#8e96a7;font-size:14px;line-height:1.7}
+.prompt-grid{margin:29px auto 0;display:grid;grid-template-columns:repeat(2,1fr);gap:10px;max-width:670px;text-align:left}.prompt-card{min-height:96px;padding:15px;border-radius:15px;background:linear-gradient(145deg,rgba(255,255,255,.036),rgba(255,255,255,.018));border:1px solid var(--border);transition:.18s ease;color:#eef1f6}.prompt-card:hover{transform:translateY(-2px);background:rgba(255,255,255,.052);border-color:rgba(139,140,255,.26)}.prompt-card strong{display:block;font-size:13px;margin-bottom:7px}.prompt-card span{display:block;color:var(--muted);font-size:12px;line-height:1.5}
+.messages{padding:27px 0 190px}.message-row{padding:11px 24px}.user-bubble{max-width:min(76%,670px);padding:12px 16px;background:linear-gradient(145deg,#252b36,#20252f);border:1px solid rgba(255,255,255,.07);border-radius:18px 18px 5px 18px;color:#f1f4f8;font-size:14px;line-height:1.58;box-shadow:0 6px 22px rgba(0,0,0,.12)}.assistant-content{color:#dfe4ed;font-size:14px;line-height:1.74}.assistant-content pre{background:#0a0c10;border-color:rgba(255,255,255,.10);border-radius:13px;padding:18px 16px}.assistant-content :not(pre)>code{background:#232936;border:1px solid rgba(255,255,255,.05);padding:2px 6px;border-radius:6px}.copy-code{top:9px;right:9px;background:rgba(255,255,255,.07);color:#c0c7d4;border:1px solid rgba(255,255,255,.06);border-radius:7px}
+.composer-wrap{padding:35px 18px 13px;background:linear-gradient(to top,var(--bg) 68%,rgba(13,15,19,.92) 83%,rgba(13,15,19,0))}.composer{border-radius:22px;border:1px solid rgba(255,255,255,.12);background:rgba(29,33,43,.94);backdrop-filter:blur(20px);box-shadow:0 18px 60px rgba(0,0,0,.34);padding:9px 10px 8px 12px}.composer:focus-within{border-color:rgba(139,140,255,.30);box-shadow:0 18px 60px rgba(0,0,0,.34),0 0 0 3px rgba(139,140,255,.045)}.composer textarea{min-height:43px;max-height:190px;color:#f5f7fb;padding:9px 9px 6px;font-size:14px}.composer textarea::placeholder{color:#7d8697}.round-btn{border-radius:10px;color:#aab2c1}.round-btn:hover{background:rgba(255,255,255,.06);color:#f5f7fb}.send-btn{background:linear-gradient(145deg,#f4f5ff,#cddcff);color:#11151d;box-shadow:0 8px 22px rgba(117,140,255,.16)}.status-line{font-size:11px;color:#7f8898}.upload-chip{background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:10px;color:#cbd2de}
+.error-banner{top:18px;right:18px;background:rgba(67,28,33,.96);border-color:rgba(255,133,133,.25);box-shadow:0 18px 50px rgba(0,0,0,.32)}
+@media(max-width:760px){.sidebar{width:min(86vw,300px);min-width:min(86vw,300px)}.sidebar.collapsed{width:min(86vw,300px);min-width:min(86vw,300px)}.prompt-grid{grid-template-columns:1fr}.topbar-badge{display:none}.message-row{padding-left:14px;padding-right:14px}.user-bubble{max-width:88%}.composer-wrap{padding-left:10px;padding-right:10px}}
+@media(max-width:520px){.prompt-card:nth-child(n+3){display:none}.empty-card h1{font-size:27px}}
+</style>
+
+</head>
+<body>
+<div class="error-banner" id="errorBanner"></div>
+<div class="app">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="sidebar-logo">N</div>
+      <div><div class="sidebar-brand-name">Nova AI</div><div class="sidebar-brand-sub">Agentic assistant</div></div>
+    </div>
+    <div class="sidebar-top"><button class="new-chat" id="newChatBtn">＋ New chat</button><button class="icon-btn" id="closeSidebarBtn">‹</button></div>
+    <div class="sidebar-label">Chats</div><div class="conversation-list" id="conversationList"></div>
+    <div class="sidebar-footer"><span class="online-dot"></span> API connected</div>
+  </aside>
+  <main class="main">
+    <header class="topbar"><div class="topbar-left"><button class="icon-btn" id="menuBtn">☰</button><div class="model-wrap"><select class="model-select" id="modelSelect"><option value="gemini-3-flash-preview">Gemini 3 Flash Preview</option></select></div></div><div class="topbar-badge">● Online</div></header>
+    <section class="chat-scroll" id="chatScroll">
+      <div class="empty-state" id="emptyState"><div class="empty-card"><div class="brand-mark">N</div><h1>What can I help you build?</h1><p>Ask questions, analyze uploaded documents, or let the agent use its tools to research and reason through a task.</p>
+<div class="prompt-grid">
+<button class="prompt-card" data-prompt="Explain a difficult technical concept in simple terms."><strong>Explain a concept</strong><span>Break down something complex into a clear explanation.</span></button>
+<button class="prompt-card" data-prompt="Help me review and improve this code."><strong>Review code</strong><span>Analyze implementation choices and suggest improvements.</span></button>
+<button class="prompt-card" data-prompt="Research a topic and summarize the important findings."><strong>Research a topic</strong><span>Use the agent tools to collect and summarize useful information.</span></button>
+<button class="prompt-card" data-prompt="Help me analyze a document I upload."><strong>Analyze a document</strong><span>Upload a file and ask questions grounded in its contents.</span></button>
+</div></div></div>
+      <div class="messages" id="messages" hidden></div>
+    </section>
+    <div class="composer-wrap">
+      <div class="composer">
+        <div class="upload-chip" id="uploadChip"></div>
+        <textarea id="messageInput" rows="1" placeholder="Message Nova AI"></textarea>
+        <div class="composer-actions">
+          <div class="left-actions"><input id="fileInput" type="file" hidden accept=".pdf,.docx,.txt,.md,.py,.csv"/><button class="round-btn" id="attachBtn" title="Upload document">＋</button></div>
+          <div class="right-actions"><button class="round-btn" id="stopBtn" title="Stop response" hidden>■</button><button class="round-btn send-btn" id="sendBtn" title="Send">↑</button></div>
+        </div>
+      </div>
+      <div class="status-line" id="statusLine"></div>
+    </div>
+  </main>
+</div>
+<script>
+marked.setOptions({breaks:true,gfm:true});
+const $=id=>document.getElementById(id);
+const els={sidebar:$("sidebar"),menuBtn:$("menuBtn"),closeSidebarBtn:$("closeSidebarBtn"),newChatBtn:$("newChatBtn"),conversationList:$("conversationList"),chatScroll:$("chatScroll"),emptyState:$("emptyState"),messages:$("messages"),messageInput:$("messageInput"),sendBtn:$("sendBtn"),stopBtn:$("stopBtn"),attachBtn:$("attachBtn"),fileInput:$("fileInput"),uploadChip:$("uploadChip"),statusLine:$("statusLine"),modelSelect:$("modelSelect"),errorBanner:$("errorBanner")};
+let currentThreadId=localStorage.getItem("currentThreadId")||crypto.randomUUID(),activeController=null,isStreaming=false;
+function setThreadId(id){currentThreadId=id;localStorage.setItem("currentThreadId",id)}
+function showEmpty(v){els.emptyState.hidden=!v;els.messages.hidden=v}
+function showError(m){els.errorBanner.textContent=m;els.errorBanner.style.display="block";setTimeout(()=>els.errorBanner.style.display="none",6000)}
+function scrollBottom(){requestAnimationFrame(()=>els.chatScroll.scrollTop=els.chatScroll.scrollHeight)}
+function renderMarkdown(v){return DOMPurify.sanitize(marked.parse(v||""))}
+function addCopyButtons(c){c.querySelectorAll("pre").forEach(pre=>{if(pre.querySelector(".copy-code"))return;const b=document.createElement("button");b.className="copy-code";b.textContent="Copy";b.onclick=async()=>{const code=pre.querySelector("code")?.innerText||pre.innerText;await navigator.clipboard.writeText(code);b.textContent="Copied";setTimeout(()=>b.textContent="Copy",1200)};pre.appendChild(b)})}
+function createMessage(role,content=""){showEmpty(false);const row=document.createElement("div");row.className=`message-row ${role}`;const inner=document.createElement("div");inner.className="message-inner";if(role==="user"){const b=document.createElement("div");b.className="user-bubble";b.textContent=content;inner.appendChild(b)}else{const body=document.createElement("div");body.className="assistant-content";body.innerHTML=renderMarkdown(content);addCopyButtons(body);inner.appendChild(body)}row.appendChild(inner);els.messages.appendChild(row);scrollBottom();return row}
+function createStreamingAssistant(){showEmpty(false);const row=document.createElement("div");row.className="message-row assistant";const inner=document.createElement("div");inner.className="message-inner";const body=document.createElement("div");body.className="assistant-content";body.innerHTML='<span class="thinking"><span class="dot"></span><span class="dot"></span><span class="dot"></span></span>';inner.appendChild(body);row.appendChild(inner);els.messages.appendChild(row);scrollBottom();return body}
+function updateAssistant(body,text){body.innerHTML=renderMarkdown(text);addCopyButtons(body);scrollBottom()}
+function setStreaming(v){isStreaming=v;els.sendBtn.disabled=v;els.stopBtn.hidden=!v;els.messageInput.disabled=v}
+function highlight(){document.querySelectorAll(".conversation").forEach(b=>b.classList.toggle("active",b.dataset.threadId===currentThreadId))}
+function newThread(){setThreadId(crypto.randomUUID());els.messages.innerHTML="";showEmpty(true);els.statusLine.textContent="";highlight();els.messageInput.focus();if(innerWidth<=760)els.sidebar.classList.remove("mobile-open")}
+async function loadConversations(){try{const r=await fetch("/conversations");if(!r.ok)throw new Error("Unable to load conversations.");const d=await r.json();els.conversationList.innerHTML="";for(const item of d.conversations||[]){const b=document.createElement("button");b.className="conversation";b.dataset.threadId=item.thread_id;b.textContent=item.title||"New chat";b.title=b.textContent;b.onclick=()=>loadHistory(item.thread_id);els.conversationList.appendChild(b)}highlight()}catch(e){showError(e.message)}}
+async function loadHistory(id){try{const r=await fetch(`/history/${encodeURIComponent(id)}`);if(!r.ok)throw new Error("Unable to load chat history.");const d=await r.json();setThreadId(id);els.messages.innerHTML="";const msgs=d.messages||[];showEmpty(msgs.length===0);for(const m of msgs)createMessage(m.role==="user"?"user":"assistant",m.content);highlight();if(innerWidth<=760)els.sidebar.classList.remove("mobile-open")}catch(e){showError(e.message)}}
+async function sendMessage(){const message=els.messageInput.value.trim();if(!message||isStreaming)return;createMessage("user",message);els.messageInput.value="";resize();const body=createStreamingAssistant();let text="";activeController=new AbortController();setStreaming(true);els.statusLine.textContent="Thinking…";try{const r=await fetch("/chat/stream",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message,thread_id:currentThreadId,model:els.modelSelect.value}),signal:activeController.signal});if(!r.ok){let detail=`Request failed (${r.status}).`;try{const d=await r.json();detail=d.error||d.detail||detail}catch{}throw new Error(detail)}if(!r.body)throw new Error("Streaming response is unavailable.");const reader=r.body.getReader(),decoder=new TextDecoder();let buffer="";while(true){const {value,done}=await reader.read();if(done)break;buffer+=decoder.decode(value,{stream:true});const events=buffer.split("\n\n");buffer=events.pop()||"";for(const block of events){const line=block.split("\n").find(x=>x.startsWith("data:"));if(!line)continue;const raw=line.slice(5).trim();if(!raw)continue;const event=JSON.parse(raw);if(event.error)throw new Error(event.error);if(event.token){text+=event.token;updateAssistant(body,text)}if(event.done)els.statusLine.textContent=""}}if(!text.trim())updateAssistant(body,"_No response returned._");await loadConversations()}catch(e){if(e.name==="AbortError"){els.statusLine.textContent="Response stopped.";if(!text.trim())updateAssistant(body,"_Response stopped._")}else{showError(e.message||"Something went wrong.");updateAssistant(body,text||"_I couldn't complete that response._")}}finally{activeController=null;setStreaming(false);els.messageInput.focus()}}
+async function uploadFile(file){if(!file)return;els.uploadChip.style.display="inline-flex";els.uploadChip.textContent=`Uploading ${file.name}…`;els.statusLine.textContent="Adding document to this chat…";const fd=new FormData();fd.append("file",file);fd.append("thread_id",currentThreadId);try{const r=await fetch("/upload",{method:"POST",body:fd});const d=await r.json();if(!r.ok||!d.success)throw new Error(d.message||"Upload failed.");els.uploadChip.textContent=`✓ ${file.name}`;els.statusLine.textContent=d.message||"Document uploaded.";await loadConversations();setTimeout(()=>{els.uploadChip.style.display="none";els.statusLine.textContent=""},3500)}catch(e){els.uploadChip.style.display="none";els.statusLine.textContent="";showError(e.message)}finally{els.fileInput.value=""}}
+function resize(){els.messageInput.style.height="auto";els.messageInput.style.height=Math.min(els.messageInput.scrollHeight,180)+"px"}
+els.newChatBtn.onclick=newThread;els.menuBtn.onclick=()=>innerWidth<=760?els.sidebar.classList.toggle("mobile-open"):els.sidebar.classList.toggle("collapsed");els.closeSidebarBtn.onclick=()=>innerWidth<=760?els.sidebar.classList.remove("mobile-open"):els.sidebar.classList.add("collapsed");els.sendBtn.onclick=sendMessage;els.stopBtn.onclick=()=>activeController?.abort();els.attachBtn.onclick=()=>els.fileInput.click();els.fileInput.onchange=()=>uploadFile(els.fileInput.files?.[0]);els.messageInput.oninput=resize;els.messageInput.onkeydown=e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendMessage()}};
+document.querySelectorAll(".prompt-card").forEach(card=>{card.addEventListener("click",()=>{els.messageInput.value=card.dataset.prompt||"";resize();els.messageInput.focus()})});
+loadConversations();els.messageInput.focus();
+</script>
+</body>
+</html>
