@@ -70,7 +70,7 @@ def add_document_to_rag(file_path: str, thread_id: str):
 
     docs: List[Document] = [
         Document(
-            page_content=chunks,
+            page_content=chunk,
             metadata={
                 "thread_id": thread_id,
                 "source": Path(file_path).name
